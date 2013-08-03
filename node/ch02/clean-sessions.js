@@ -4,42 +4,54 @@ var redis = require('redis'),
 var LIMIT = 10000000;
 
 console.log('clean-sessions started');
-console.log('process.argv', process.argv);
-
 var limit = process.argv.length > 2 ? parseInt(process.argv[2], 10) : LIMIT;
+var maxRuns = process.argv.length > 3 ? parseInt(process.argv[3], 10) : 10;
+console.log('limit', limit, 'maxRuns', maxRuns);
 
 var cleanSessions = function(cb) {
 	client.zcard('recent:', function(err, size) {
 		if (err) return cb(err);
-		console.log('recent:', 'size', size);
 		if (size > limit) {
 			var endIndex = Math.min(size - limit, 100);
-			console.log('endIndex', endIndex);
-			client.zrange('recent:', 0, endIndex -1, function(err, tokens) {
+			client.zrange('recent:', 0, endIndex - 1, function(err, tokens) {
 				if (err) return cb(err);
+
 				var sessionKeys = [];
-				console.log('tokens', tokens);
 				tokens.forEach(function(token) {
 					sessionKeys.push('viewed:' + token);
 				});
-				console.log('sessionKeys', sessionKeys);
 
 				client.del(sessionKeys, function(err) {
 					if (err) return cb(err);
-					client.hdel("login:", tokens, function(err) {
+					client.hdel(["login:"].concat(tokens), function(err) {
 						if (err) return cb(err);
-						client.zrem("recent:", tokens, function(err) {
+						client.zrem(["recent:"].concat(tokens), function(err) {
 							if (err) return cb(err);
-							cb(null, 'OK');
+							cb(null, size);
 						});
 					});
 				});
 			});
+		} else {
+			cb(null, 0);
 		}
+
 	});
 };
 
-cleanSessions(function(err, result) {
-	console.log('err', 'result', err, result);
-	process.exit(err ? 1 : 0);
-});
+var count = 0;
+var timeoutFunction = function() {
+	cleanSessions(function(err, result) {
+		if (err || count >= maxRuns) {
+			process.exit(err ? 1 : 0);
+		} else {
+			console.log('number of sessions cleaned', result);
+		}
+	});
+	if (count < maxRuns) {
+		count += 1;
+		setTimeout(timeoutFunction, 1000);
+	}
+};
+
+setTimeout(timeoutFunction, 1000);
