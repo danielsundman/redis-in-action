@@ -17,7 +17,7 @@ var updateToken = function(client, token, user, item, cb) {
 					client.zremrangebyrank('viewed:' + token, 0, -26, function(err) {
 						if (err) return cb(err);
 						cb();
-					})
+					});
 				});
 			} else {
 				cb();

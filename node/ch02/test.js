@@ -8,7 +8,7 @@ client.flushdb();
 
 var startCleanSessions = function() {
 
-	var p = fork('./clean-sessions', [0, 4]); // limit=0, maxRuns=4
+	var p = fork(__dirname + '/clean-sessions', [0, 4]); // limit=0, maxRuns=4
 	p.on('exit', function(code) {
 		console.log('clean-sessions process exited with code ' + code);
 		client.hlen("login:", function(err, s) {
@@ -34,7 +34,6 @@ var testLoginCookies = function() {
 				if (err) console.log('err', err);
 				console.log('What username do we get when we look up that token?');
 				console.log(result);
-
 			});
 		});
 	};

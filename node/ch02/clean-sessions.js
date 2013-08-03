@@ -3,10 +3,20 @@ var redis = require('redis'),
 
 var LIMIT = 10000000;
 
-console.log('clean-sessions started');
 var limit = process.argv.length > 2 ? parseInt(process.argv[2], 10) : LIMIT;
 var maxRuns = process.argv.length > 3 ? parseInt(process.argv[3], 10) : 10;
-console.log('limit', limit, 'maxRuns', maxRuns);
+var doLog = process.argv.length > 4 ? process.argv[4] !== 'false' : true;
+
+// Optionally turn logging off
+var log = function() {
+	var args = Array.prototype.slice.call(arguments);
+	if (doLog) {
+		console.log.apply(null, args);
+	}
+};
+
+log('clean-sessions started');
+log('limit', limit, 'maxRuns', maxRuns);
 
 var cleanSessions = function(cb) {
 	client.zcard('recent:', function(err, size) {
@@ -45,7 +55,7 @@ var timeoutFunction = function() {
 		if (err || count >= maxRuns) {
 			process.exit(err ? 1 : 0);
 		} else {
-			console.log('number of sessions cleaned', result);
+			log('number of sessions cleaned', result);
 		}
 	});
 	if (count < maxRuns) {
