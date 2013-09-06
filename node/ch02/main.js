@@ -16,7 +16,10 @@ var updateToken = function(client, token, user, item, cb) {
 					if (err) return cb(err);
 					client.zremrangebyrank('viewed:' + token, 0, -26, function(err) {
 						if (err) return cb(err);
-						cb();
+						client.zincrby('viewed:', -1, item, function(err) {
+							if (err) return cb(err);
+							cb();
+						})
 					});
 				});
 			} else {
@@ -26,7 +29,20 @@ var updateToken = function(client, token, user, item, cb) {
 	});
 };
 
+var addToCart = function(client, session, item, count, cb) {
+	if (count <= 0) {
+		client.hrem('cart:' + session, item, function(err) {
+			cb(err);
+		});
+	} else {
+		client.hset('cart:' + session, item, count, function(err) {
+			cb(err);
+		});
+	}
+};
+
 module.exports = {
 	checkToken: checkToken,
-	updateToken: updateToken
+	updateToken: updateToken,
+	addToCart: addToCart
 };
