@@ -18,6 +18,28 @@ var log = function() {
 log('clean-sessions started');
 log('limit', limit, 'maxRuns', maxRuns);
 
+var tokensToSessionKeys = function(tokens) {
+	var sessionKeys = [];
+	tokens.forEach(function(token) {
+		sessionKeys.push('viewed:' + token);
+	});
+	return sessionKeys;
+};
+
+var deleteSessions = function(tokens, cb) {
+	var sessionKeys = tokensToSessionKeys(tokens);
+	client.del(sessionKeys, function(err) {
+		if (err) return cb(err);
+		client.hdel(["login:"].concat(tokens), function(err) {
+			if (err) return cb(err);
+			client.zrem(["recent:"].concat(tokens), function(err) {
+				if (err) return cb(err);
+				cb();
+			});
+		});
+	});
+};
+
 var cleanSessions = function(cb) {
 	client.zcard('recent:', function(err, size) {
 		if (err) return cb(err);
@@ -25,43 +47,30 @@ var cleanSessions = function(cb) {
 			var endIndex = Math.min(size - limit, 100);
 			client.zrange('recent:', 0, endIndex - 1, function(err, tokens) {
 				if (err) return cb(err);
-
-				var sessionKeys = [];
-				tokens.forEach(function(token) {
-					sessionKeys.push('viewed:' + token);
-				});
-
-				client.del(sessionKeys, function(err) {
+				deleteSessions(tokens, function(err) {
 					if (err) return cb(err);
-					client.hdel(["login:"].concat(tokens), function(err) {
-						if (err) return cb(err);
-						client.zrem(["recent:"].concat(tokens), function(err) {
-							if (err) return cb(err);
-							cb(null, size);
-						});
-					});
+					cb(null, size);
 				});
 			});
 		} else {
 			cb(null, 0);
 		}
-
 	});
 };
 
+// Run every second
 var count = 0;
-var timeoutFunction = function() {
+var callCleanSessions = function() {
 	cleanSessions(function(err, result) {
+		if (!err) log('number of sessions cleaned', result);
 		if (err || count >= maxRuns) {
 			process.exit(err ? 1 : 0);
-		} else {
-			log('number of sessions cleaned', result);
 		}
 	});
-	if (count < maxRuns) {
+	if (count <= maxRuns) {
 		count += 1;
-		setTimeout(timeoutFunction, 1000);
+		setTimeout(callCleanSessions, 1000);
 	}
 };
 
-setTimeout(timeoutFunction, 1000);
+callCleanSessions();
